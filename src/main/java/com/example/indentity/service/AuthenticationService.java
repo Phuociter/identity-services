@@ -8,24 +8,29 @@ import com.example.indentity.exception.AppException;
 import com.example.indentity.exception.ErrorCode;
 import com.example.indentity.repository.UserRepository;
 import com.example.indentity.dto.response.AuthenticationResponse;
+import com.example.indentity.dto.request.IntrospectRequest;
+import com.example.indentity.dto.response.IntrospectResponse;
 import lombok.RequiredArgsConstructor;
 
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;// dùng để mã hóa mật khẩu bằng thuật toán bcrypt
+import org.springframework.security.crypto.password.PasswordEncoder;// dùng để mã hóa mật khẩu và xác thực mật khẩu đã mã hóa
+import org.springframework.stereotype.Service;// dùng cho việc
 import com.nimbusds.jose.JWSObject;// tao token JWT
+import com.nimbusds.jose.JWSVerifier;// xac thuc token
 import com.nimbusds.jwt.JWTClaimsSet;// tao payload cho token
 import com.nimbusds.jose.JWSHeader;// tao header cho token
-import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;// xac dinh thuat toan ma hoa cho token
+import com.nimbusds.jose.JOSEException;// xac dinh loi khi tao token(lỗi giải mẫ)
+import java.text.ParseException;// xác định lỗi khi phân tích cú pháp token JWT (ví dụ: token không hợp lệ hoặc không thể phân tích được)
 import com.nimbusds.jose.Payload;// tao payload cho token
 import com.nimbusds.jose.crypto.MACSigner;// tao sign
-import java.time.Instant;
-
-
+import com.nimbusds.jose.crypto.MACVerifier;// xac thuc token
+import com.nimbusds.jwt.SignedJWT;// tao token JWT co ky
+import java.time.Instant;//dùng để làm việc với thời gian, đặc biệt là khi cần tính toán thời gian hết hạn của token JWT
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;// tao log
 
 @Slf4j
@@ -35,8 +40,9 @@ import lombok.extern.slf4j.Slf4j;// tao log
 public class AuthenticationService {
     
     UserRepository userRepository;
-    @NonFinal//anotation cua lombok de cho phep thay doi gia tri cua bien
-    protected static final String SIGNER_KEY = "7jykC9LD/jWovKd2wo9bHcTHsb9dVjvuYHVHKLeodUcPqCZD6FdsZYh9JHZ0ltD+vjKsgpO14GCVUSPLyrrGUA==";
+    @NonFinal//anotation cua lombok de cho phep thay doi gia tri cua bien khi đang dùng BUILD
+    @Value("${jwt.secret}")//annotation cho phep lấy giá trị từ yml
+    protected String SIGNER_KEY;
 
     public AuthenticationResponse authenticate(AuthenticationRequest request){
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
@@ -49,7 +55,7 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         
         var token = generateToken(user.getUsername());
-        //verify Token 28:30
+
         return AuthenticationResponse.builder()
             .authenticated(true)
             .token(token)
@@ -65,13 +71,13 @@ public class AuthenticationService {
             .issuer("intern.com")
             .issueTime(new Date())
             .expirationTime(new Date(
-                Instant.now().plus(1,ChronoUnit.HOURS).toEpochMilli())// token sẽ hết hạn sau 1 giờ
+                Instant.now().plus(1,ChronoUnit.HOURS).toEpochMilli())// token sẽ hết hạn sau 1 giờ(tính mốc thời gian sau 1 giờ)
             )
             .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());// payload là dữ liệu của token được mã hóa dưới dạng JSON
 
-        JWSObject jwsObject = new JWSObject(header, payload);
+        JWSObject jwsObject = new JWSObject(header, payload);//dùng để tạo đối tượng JWS
         try {
             jwsObject.sign(new MACSigner(SIGNER_KEY));
             return jwsObject.serialize();// serialize() sẽ trả về token dưới dạng chuỗi
@@ -80,5 +86,23 @@ public class AuthenticationService {
             throw new RuntimeException("Error signing the token", e);
         }
 
+    }
+
+    public IntrospectResponse introspect(IntrospectRequest request) 
+    throws JOSEException,ParseException{
+
+        var token = request.getToken();
+        
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+
+        SignedJWT signedJWT = SignedJWT.parse(token);
+
+        Date expitytime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        var verified = signedJWT.verify(verifier);
+
+        return IntrospectResponse.builder()
+        .valid(verified && expitytime.after(new Date()))
+        .build();
     }
 }

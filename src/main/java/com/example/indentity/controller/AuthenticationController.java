@@ -1,14 +1,17 @@
 package com.example.indentity.controller;
 
 import com.example.indentity.dto.request.ApiResponse;
-
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
-
-import org.springframework.web.bind.annotation.*;
 import com.example.indentity.dto.request.AuthenticationRequest;
 import com.example.indentity.dto.response.AuthenticationResponse;
 import com.example.indentity.service.AuthenticationService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import java.text.ParseException;
+import org.springframework.web.bind.annotation.*;
+import com.nimbusds.jose.JOSEException;
+import com.example.indentity.dto.request.IntrospectRequest;
+import com.example.indentity.dto.response.IntrospectResponse;
 
 @RestController
 @RequestMapping("/auth")
@@ -25,4 +28,14 @@ public class AuthenticationController {
         result(result)
         .build();
     }
+
+    @PostMapping("/introspect")
+    ApiResponse<IntrospectResponse> introspect(@RequestBody IntrospectRequest request) throws JOSEException, ParseException{
+        var result = authenticationService.introspect(request);
+
+        return ApiResponse.<IntrospectResponse>builder().
+        result(result)
+        .build();
+    }
+
 }

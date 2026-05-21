@@ -2,6 +2,7 @@ package com.example.indentity.service;
 
 
 import com.example.indentity.entity.User;
+import com.example.indentity.enums.Role;
 import com.example.indentity.exception.AppException;
 import com.example.indentity.exception.ErrorCode;
 import com.example.indentity.mapper.UserMapper;
@@ -18,12 +19,14 @@ import com.example.indentity.dto.request.UserCreationRequest;
 import com.example.indentity.dto.request.UserUpdateRequest;
 import com.example.indentity.dto.response.UserResponse;
 
+import java.util.HashSet;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor// tự động tạo constructor với tất cả các trường được khai báo là final hoặc được đánh dấu với @NonNull
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)//tự động đặt tất cả các trường là private và final, giúp giảm bớt boilerplate code
 public class UserService {
+
     UserRepository userRepository;
     UserMapper userMapper;
     
@@ -37,6 +40,13 @@ public class UserService {
         
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        
+        HashSet<String> role = new HashSet<>();
+        role.add(Role.USER.name());
+        user.setRole(role);
+
+        user.setRole(role);
+
         return userRepository.save(user);
     }
 
