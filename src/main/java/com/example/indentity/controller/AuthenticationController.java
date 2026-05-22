@@ -20,7 +20,7 @@ import com.example.indentity.dto.response.IntrospectResponse;
 public class AuthenticationController {
     AuthenticationService authenticationService;
 
-    @PostMapping("/log-in")
+    @PostMapping("/token")
     ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request){
         var result = authenticationService.authenticate(request);
 
