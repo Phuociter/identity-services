@@ -14,9 +14,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-
-
-
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import com.example.indentity.enums.Role;
 
 
 @Configuration
@@ -32,16 +34,30 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity.authorizeHttpRequests(request ->
-            request.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()
+            request.requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINTS).permitAll()// cho phép tất cả người dùng truy cập endpoint POST /users, /auth/token và /auth/introspect mà không cần xác thực
+                    .requestMatchers(HttpMethod.GET, "/users").hasRole(Role.ADMIN.name())// chỉ cho phép người dùng có vai trò ADMIN truy cập endpoint GET /users
             .anyRequest().authenticated());
 
         httpSecurity.oauth2ResourceServer(oauth2 -> 
-            oauth2.jwt(jwtConfigurer -> jwtConfigurer.decoder(jwtDecoder())));
+            oauth2.jwt(jwtConfigurer -> 
+                jwtConfigurer.decoder(jwtDecoder())
+                        .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                ));
 
         httpSecurity.csrf(AbstractHttpConfigurer::disable);// tắt CSRF để cho phép POST request từ client
 
-
         return httpSecurity.build();
+    }
+
+    @Bean
+    JwtAuthenticationConverter jwtAuthenticationConverter(){
+        JwtGrantedAuthoritiesConverter jwtAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        jwtAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwtAuthoritiesConverter);
+
+        return jwtAuthenticationConverter;
     }
 
     @Bean
@@ -53,5 +69,12 @@ public class SecurityConfig {
         .macAlgorithm(MacAlgorithm.HS512)// xác định thuật toán mã hóa HMAC-SHA512 cho việc ký token JWT
         .build();
     }
+
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(10);
+    }
+
+
 
 }

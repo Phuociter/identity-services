@@ -10,10 +10,13 @@ import com.example.indentity.repository.UserRepository;
 import com.example.indentity.dto.response.AuthenticationResponse;
 import com.example.indentity.dto.request.IntrospectRequest;
 import com.example.indentity.dto.response.IntrospectResponse;
+import com.example.indentity.entity.User;
+
 import lombok.RequiredArgsConstructor;
 
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.StringJoiner;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;// dùng để mã hóa mật khẩu bằng thuật toán bcrypt
 import org.springframework.security.crypto.password.PasswordEncoder;// dùng để mã hóa mật khẩu và xác thực mật khẩu đã mã hóa
@@ -31,6 +34,8 @@ import com.nimbusds.jose.crypto.MACVerifier;// xac thuc token
 import com.nimbusds.jwt.SignedJWT;// tao token JWT co ky
 import java.time.Instant;//dùng để làm việc với thời gian, đặc biệt là khi cần tính toán thời gian hết hạn của token JWT
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.CollectionUtils;
+
 import lombok.extern.slf4j.Slf4j;// tao log
 
 @Slf4j
@@ -54,7 +59,7 @@ public class AuthenticationService {
         if(!authenticated)
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         
-        var token = generateToken(user.getUsername());
+        var token = generateToken(user);
 
         return AuthenticationResponse.builder()
             .authenticated(true)
@@ -63,16 +68,17 @@ public class AuthenticationService {
     }
 
 // cau truc mot token JWT bao gom header, payload va signature
-    private String generateToken(String username){
+    private String generateToken(User user){
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
         
         JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
-            .subject(username)
+            .subject(user.getUsername())
             .issuer("intern.com")
             .issueTime(new Date())
             .expirationTime(new Date(
                 Instant.now().plus(1,ChronoUnit.HOURS).toEpochMilli())// token sẽ hết hạn sau 1 giờ(tính mốc thời gian sau 1 giờ)
             )
+            .claim("scope", buildScope(user))// thêm một claim tùy chỉnh có tên là "scope" với giá trị "user" vào payload của token JWT
             .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());// payload là dữ liệu của token được mã hóa dưới dạng JSON
@@ -104,5 +110,13 @@ public class AuthenticationService {
         return IntrospectResponse.builder()
         .valid(verified && expitytime.after(new Date()))
         .build();
+    }
+
+    private String buildScope(User user){
+        StringJoiner stringJoiner = new StringJoiner(" ");
+        if(!CollectionUtils.isEmpty(user.getRoles()))
+            user.getRoles().forEach(stringJoiner::add);
+
+        return stringJoiner.toString();
     }
 }
